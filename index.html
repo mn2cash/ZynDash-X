@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,6 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://esm.run/web-llm"></script>
   <style>
     .flash-error {
       position: fixed;
@@ -33,6 +33,7 @@
   <div class="glow-bg glow-two"></div>
   <div class="notification-tray" id="notificationTray" aria-live="polite"></div>
 
+  <!-- Settings Modal -->
   <div class="modal" id="settingsModal" aria-hidden="true" role="dialog">
     <div class="modal-content">
       <div class="modal-head">
@@ -85,6 +86,7 @@
     </div>
   </div>
 
+  <!-- FX Modal -->
   <div class="modal" id="fxModal" aria-hidden="true" role="dialog">
     <div class="modal-content">
       <div class="modal-head">
@@ -242,6 +244,7 @@
         </div>
       </header>
 
+      <!-- Overview Section -->
       <section class="section active" data-section="overview">
         <div class="headline">
           <div class="title-with-icon">
@@ -258,6 +261,7 @@
           </div>
           <div class="pill">Updated <span id="lastUpdated">--</span></div>
         </div>
+
         <div class="stats-grid">
           <div class="card stat filterable crypto-card" data-filter="bitcoin btc price crypto">
             <div class="card-top">
@@ -265,7 +269,7 @@
               <span class="chip chip-cyan">BTC</span>
             </div>
             <h4 id="btcPrice">$-</h4>
-            <p class="muted small">Tracking live via CoinCap</p>
+            <p class="muted small">Tracking live via CryptoCompare</p>
           </div>
           <div class="card stat filterable crypto-card" data-filter="ethereum eth price crypto">
             <div class="card-top">
@@ -273,7 +277,7 @@
               <span class="chip chip-purple">ETH</span>
             </div>
             <h4 id="ethPrice">$-</h4>
-            <p class="muted small">Second-layer flows in sync</p>
+            <p class="muted small">Layered signals synced</p>
           </div>
           <div class="card stat filterable" data-filter="scarborough weather wind code">
             <div class="card-top">
@@ -288,24 +292,23 @@
               <p>FX Pulse</p>
               <span class="chip chip-green">FX</span>
             </div>
-            <h4>USD -&gt; EUR/GBP</h4>
+            <h4>USD -> EUR/GBP</h4>
             <p class="muted small">EUR: <span id="eurRate">-</span> | GBP: <span id="gbpRate">-</span></p>
             <button class="ghost-btn small-btn ripple" id="fxRadarBtn" aria-label="Open FX radar" data-tooltip="Open FX radar chart">FX Radar</button>
           </div>
         </div>
 
         <div class="charts">
-          <div class="chart-card glass filterable" data-filter="btc trend chart" data-tooltip="BTC price trend with live updates">
+          <div class="chart-card glass filterable" data-filter="btc trend chart">
             <div class="card-head">
               <div>
                 <p class="eyebrow">Crypto</p>
                 <h4>BTC Live Trend</h4>
               </div>
-              <div class="chip chip-cyan">Live feed</div>
             </div>
             <canvas id="btcChart" height="140"></canvas>
           </div>
-          <div class="chart-card glass filterable" data-filter="weather atmosphere chart" data-tooltip="Live temperature and wind readings">
+          <div class="chart-card glass filterable" data-filter="weather atmosphere chart">
             <div class="card-head">
               <div>
                 <p class="eyebrow">Atmospherics</p>
@@ -315,7 +318,7 @@
             </div>
             <canvas id="weatherChart" height="140"></canvas>
           </div>
-          <div class="chart-card glass filterable" data-filter="currency fx chart" data-tooltip="USD split into EUR and GBP">
+          <div class="chart-card glass filterable" data-filter="currency fx chart">
             <div class="card-head">
               <div>
                 <p class="eyebrow">Currencies</p>
@@ -326,9 +329,7 @@
             <canvas id="currencyChart" height="140"></canvas>
           </div>
         </div>
-      </section>
 
-      <section class="section" data-section="overview">
         <div class="card reactbits-panel">
           <div class="card-head">
             <div class="title-with-icon">
@@ -377,6 +378,7 @@
         </div>
       </section>
 
+      <!-- Markets Section -->
       <section class="section" data-section="markets">
         <div class="headline">
           <div class="title-with-icon">
@@ -414,14 +416,14 @@
           </table>
         </div>
         <div class="charts">
-          <div class="chart-card glass" data-tooltip="BTC sparkline with 7d context">
+          <div class="chart-card glass" data-tooltip="BTC sparkline with 24h context">
             <div class="card-head">
               <p class="eyebrow">BTC</p>
               <h4>Micro Trend</h4>
             </div>
             <canvas id="btcMini" height="140"></canvas>
           </div>
-          <div class="chart-card glass" data-tooltip="ETH sparkline with 7d context">
+          <div class="chart-card glass" data-tooltip="ETH sparkline with 24h context">
             <div class="card-head">
               <p class="eyebrow">ETH</p>
               <h4>Micro Trend</h4>
@@ -431,6 +433,7 @@
         </div>
       </section>
 
+      <!-- Realtime Section -->
       <section class="section" data-section="realtime">
         <div class="headline">
           <div class="title-with-icon">
@@ -469,6 +472,7 @@
         </div>
       </section>
 
+      <!-- Weather Section -->
       <section class="section" data-section="weather">
         <div class="headline">
           <div class="title-with-icon">
@@ -484,14 +488,14 @@
           </div>
           <div class="pill">Forecast & live</div>
         </div>
-        <div class="stats-grid">
 
+        <div class="stats-grid">
           <div class="card stat filterable" data-filter="temperature weather">
             <div class="card-top">
               <p>Temperature</p>
-              <span class="chip chip-blue">&deg;C</span>
+              <span class="chip chip-blue">?C</span>
             </div>
-            <h4><span id="tempDetail">-</span>&deg;C</h4>
+            <h4><span id="tempDetail">-</span>?C</h4>
             <p class="muted small">Feels steady</p>
           </div>
           <div class="card stat filterable" data-filter="wind speed">
@@ -520,6 +524,7 @@
             <p class="muted small">Live code</p>
           </div>
         </div>
+
         <div class="chart-card glass" data-tooltip="5-day forecast highs and lows">
           <div class="card-head">
             <div>
@@ -532,6 +537,7 @@
         </div>
       </section>
 
+      <!-- Settings Section -->
       <section class="section" data-section="settings">
         <div class="headline">
           <div class="title-with-icon">
@@ -556,13 +562,39 @@
         </div>
       </section>
 
+      <!-- AI Section -->
+      <section class="section" data-section="ai">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="6" y="3" width="12" height="18" rx="3"/>
+                <circle cx="10" cy="10" r="1.2"/>
+                <circle cx="14" cy="10" r="1.2"/>
+                <path d="M9 15h6"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">ZynAI</p>
+              <h3>Assistant</h3>
+            </div>
+          </div>
+          <div class="pill">Inline assistant</div>
+        </div>
+        <div class="card">
+          <p class="muted">Open the AI panel to chat with ZynAI.</p>
+          <button class="primary-btn ripple" id="aiOpen">Open ZynAI</button>
+        </div>
+      </section>
+
       <footer class="footer">
-        <p>ZynDash X — Crafted for real-time clarity.</p>
+        <p>ZynDash X ? Crafted for real-time clarity.</p>
         <p class="muted">Neon-grade analytics with dark/light elegance.</p>
       </footer>
     </div>
   </div>
 
+  <!-- Mobile Nav -->
   <nav class="mobile-nav">
     <a href="#overview" class="mobile-link active" data-mobile-route="overview">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -601,6 +633,7 @@
     </a>
   </nav>
 
+  <!-- AI Overlay & Panel -->
   <div class="ai-overlay" id="aiOverlay"></div>
   <div class="ai-panel" id="aiPanel" aria-hidden="true" role="dialog">
     <div class="ai-header">
@@ -619,6 +652,7 @@
         </div>
       </div>
       <div class="ai-actions">
+        <!-- clear button injected by script -->
         <button class="ghost-btn small-btn ripple" id="aiMinimize" aria-label="Minimize chat">_</button>
         <button class="ghost-btn small-btn ripple" id="aiClose" aria-label="Close chat">&times;</button>
       </div>
@@ -636,6 +670,5 @@
   </div>
 
   <script src="script.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/web-llm"></script>
 </body>
 </html>

@@ -60,13 +60,10 @@
 
   // ----- State ------------------------------------------------------------
   const API = {
-    btc: "https://api.coincap.io/v2/assets/bitcoin",
-    eth: "https://api.coincap.io/v2/assets/ethereum",
-    markets: "https://api.coincap.io/v2/assets?ids=bitcoin,ethereum",
-    history: (id) => `https://api.coincap.io/v2/assets/${id}/history?interval=h1`,
-    ws: "wss://ws.coincap.io/prices?assets=bitcoin,ethereum",
-    altBtc: "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-    altEth: "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT",
+    prices: "https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD",
+    historyBtc: "https://min-api.cryptocompare.com/data/v2/histohour?fsym=BTC&tsym=USD&limit=24",
+    historyEth: "https://min-api.cryptocompare.com/data/v2/histohour?fsym=ETH&tsym=USD&limit=24",
+    ws: null,
     weather:
       "https://api.open-meteo.com/v1/forecast?latitude=54.28&longitude=-0.40&current_weather=true&hourly=relativehumidity_2m&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max&forecast_days=5&timezone=auto",
     fx: "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP",
@@ -84,8 +81,6 @@
     aiHistory: [],
     aiEngine: null,
     aiLoading: false,
-    offlineUntil: 0,
-    offlineNotified: false,
   };
 
   // ----- Fetch helpers ----------------------------------------------------
@@ -124,38 +119,9 @@
     fx: { eur: 0.92, gbp: 0.79 },
   };
   async function fetchJson(url) {
-    if (state.offlineUntil && Date.now() < state.offlineUntil) {
-      console.warn("Offline window active, skipping fetch for", url);
-      return null;
-    }
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // success: clear offline flags/backoff
-      state.offlineUntil = 0;
-      state.offlineNotified = false;
-      backoff.delay = 1000;
-      return await res.json();
-    } catch (err) {
-      const isNetwork = err?.message?.toLowerCase().includes("fetch") || err?.message?.includes("ERR_NAME_NOT_RESOLVED");
-      if (isNetwork) {
-        state.offlineUntil = Date.now() + 5 * 60 * 1000; // pause 5 minutes
-        if (!state.offlineNotified) {
-          flashError("Network unavailable, showing cached data.");
-          state.offlineNotified = true;
-          console.warn("Network unreachable, using offline mode:", err);
-        } else if (state.offlineUntil && Date.now() < state.offlineUntil) {
-          // Already offline; avoid spamming console
-          return null;
-        }
-      } else {
-        console.error("Fetch error:", err);
-        flashError("Crypto data failed to load.");
-      }
-      await new Promise((r) => setTimeout(r, backoff.delay));
-      backoff.delay = Math.min(backoff.max, backoff.delay * 1.6);
-      return null;
-    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   }
 
   // ----- Charts -----------------------------------------------------------
@@ -285,22 +251,20 @@
     });
   }
 
-  // ----- Crypto (CoinCap) -------------------------------------------------
+  // ----- Crypto (CryptoCompare) -------------------------------------------------
   async function fetchHistory(assetId) {
-    try {
-      const historyRes = await fetchJson(API.history(assetId));
-      const points = historyRes?.data || [];
-      if (!points.length) throw new Error("No history");
-      const labels = points.map((p) => new Date(p.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      const values = points.map((p) => Number(p.priceUsd));
-      return { labels, values };
-    } catch (err) {
-      if (!(state.offlineUntil && Date.now() < state.offlineUntil)) {
-        console.warn("History error, using fallback:", err?.message || err);
-        flashError("Crypto history unavailable, using cached snapshot.");
-      }
+    const url = assetId === "ethereum" ? API.historyEth : API.historyBtc;
+    const historyRes = await fetchJson(url);
+    const points = historyRes?.Data?.Data || [];
+    if (!points.length) {
+      flashError("Crypto history unavailable.");
       return fallback.history(assetId === "bitcoin" ? 68000 : 3600);
     }
+    const labels = points.map((p) =>
+      new Date(p.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
+    const values = points.map((p) => Number(p.close));
+    return { labels, values };
   }
 
   // Crypto prices via CryptoCompare
@@ -310,20 +274,24 @@
     const cardBTC = document.querySelector('.crypto-card[data-filter*="bitcoin"]');
     const cardETH = document.querySelector('.crypto-card[data-filter*="ethereum"]');
     try {
-      const res = await fetch("https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD");
-      const data = await res.json();
-
+      const data = await fetchJson(API.prices);
       const btc = data?.BTC?.USD;
       const eth = data?.ETH?.USD;
 
       if (btcPriceEl && typeof btc === "number") btcPriceEl.textContent = `$${btc.toLocaleString()}`;
       if (ethPriceEl && typeof eth === "number") ethPriceEl.textContent = `$${eth.toLocaleString()}`;
+      const updated = document.querySelector("#lastUpdated");
+      if (updated) updated.textContent = new Date().toLocaleTimeString();
 
       if (cardBTC) animateCard(cardBTC);
       if (cardETH) animateCard(cardETH);
     } catch (err) {
       console.error("Crypto error:", err);
       flashError("Crypto prices unavailable");
+      if (btcPriceEl) btcPriceEl.textContent = fmtCurrency(Number(fallback.btc.priceUsd));
+      if (ethPriceEl) ethPriceEl.textContent = fmtCurrency(Number(fallback.eth.priceUsd));
+      const updated = document.querySelector("#lastUpdated");
+      if (updated) updated.textContent = new Date().toLocaleTimeString();
 
       if (cardBTC) flashCardError(cardBTC);
       if (cardETH) flashCardError(cardETH);
@@ -333,45 +301,39 @@
   async function fetchMarkets() {
     const table = $("#marketsTable");
     if (!table) return;
-    if (state.offlineUntil && Date.now() < state.offlineUntil) {
-      const assets = fallback.markets();
-      const btcHist = fallback.history(68000);
-      const ethHist = fallback.history(3600);
-      const rows = assets.map((asset) => {
-        const hist = asset.id === "bitcoin" ? btcHist : ethHist;
-        const high = Math.max(...hist.values);
-        const low = Math.min(...hist.values);
-        return `
-          <tr>
-            <td>${asset.name} (${asset.symbol})</td>
-            <td>${fmtCurrency(asset.priceUsd)}</td>
-            <td style="color:${Number(asset.changePercent24Hr) >= 0 ? "#6cf4c5" : "#ff7b9c"}">${fmtChange(
-          asset.changePercent24Hr
-        )}</td>
-            <td>${fmtCurrency(high)}</td>
-            <td>${fmtCurrency(low)}</td>
-            <td>${fmtNumber(asset.marketCapUsd)}</td>
-          </tr>
-        `;
-      });
-      table.innerHTML = rows.join("");
-      return;
-    }
     try {
-      const res = await fetchJson(API.markets);
-      let assets = (res?.data && res.data.length ? res.data : null);
-      if (!assets) {
-        const [altBtc, altEth] = await Promise.all([fetchBinancePrice(API.altBtc), fetchBinancePrice(API.altEth)]);
-        assets = [
-          { id: "bitcoin", name: "Bitcoin", symbol: "BTC", priceUsd: altBtc || fallback.btc.priceUsd, changePercent24Hr: fallback.btc.changePercent24Hr, marketCapUsd: fallback.btc.marketCapUsd },
-          { id: "ethereum", name: "Ethereum", symbol: "ETH", priceUsd: altEth || fallback.eth.priceUsd, changePercent24Hr: fallback.eth.changePercent24Hr, marketCapUsd: fallback.eth.marketCapUsd },
-        ];
-      }
+      const prices = await fetchJson(API.prices);
+      const btcPrice = prices?.BTC?.USD;
+      const ethPrice = prices?.ETH?.USD;
 
       const [btcHist, ethHist] = await Promise.all([fetchHistory("bitcoin"), fetchHistory("ethereum")]);
 
+      const btcChange = btcHist.values.length > 1 ? ((btcHist.values.at(-1) - btcHist.values[0]) / btcHist.values[0]) * 100 : 0;
+      const ethChange = ethHist.values.length > 1 ? ((ethHist.values.at(-1) - ethHist.values[0]) / ethHist.values[0]) * 100 : 0;
+
+      const assets = [
+        {
+          id: "bitcoin",
+          name: "Bitcoin",
+          symbol: "BTC",
+          priceUsd: typeof btcPrice === "number" ? btcPrice : Number(fallback.btc.priceUsd),
+          changePercent24Hr: btcChange,
+          history: btcHist,
+          marketCapUsd: fallback.btc.marketCapUsd,
+        },
+        {
+          id: "ethereum",
+          name: "Ethereum",
+          symbol: "ETH",
+          priceUsd: typeof ethPrice === "number" ? ethPrice : Number(fallback.eth.priceUsd),
+          changePercent24Hr: ethChange,
+          history: ethHist,
+          marketCapUsd: fallback.eth.marketCapUsd,
+        },
+      ];
+
       const rows = assets.map((asset) => {
-        const hist = asset.id === "bitcoin" ? btcHist : ethHist;
+        const hist = asset.history;
         const high = Math.max(...hist.values);
         const low = Math.min(...hist.values);
         return `
@@ -388,69 +350,47 @@
         `;
       });
       table.innerHTML = rows.join("");
+      if (state.charts.btc) {
+        state.charts.btc.data.labels = btcHist.labels;
+        state.charts.btc.data.datasets[0].data = btcHist.values;
+        state.charts.btc.update("none");
+      }
+      if (state.charts.btcMini) {
+        state.charts.btcMini.data.labels = btcHist.labels;
+        state.charts.btcMini.data.datasets[0].data = btcHist.values;
+        state.charts.btcMini.update("none");
+      }
+      if (state.charts.ethMini) {
+        state.charts.ethMini.data.labels = ethHist.labels;
+        state.charts.ethMini.data.datasets[0].data = ethHist.values;
+        state.charts.ethMini.update("none");
+      }
     } catch (err) {
       console.error("Markets error:", err);
       flashError("Crypto data failed to load.");
-      const assets = fallback.markets();
-      const btcHist = fallback.history(68000);
-      const ethHist = fallback.history(3600);
-      const rows = assets.map((asset) => {
-        const hist = asset.id === "bitcoin" ? btcHist : ethHist;
-        const high = Math.max(...hist.values);
-        const low = Math.min(...hist.values);
-        return `
-          <tr>
-            <td>${asset.name} (${asset.symbol})</td>
-            <td>${fmtCurrency(asset.priceUsd)}</td>
-            <td style="color:${Number(asset.changePercent24Hr) >= 0 ? "#6cf4c5" : "#ff7b9c"}">${fmtChange(
-          asset.changePercent24Hr
-        )}</td>
-            <td>${fmtCurrency(high)}</td>
-            <td>${fmtCurrency(low)}</td>
-            <td>${fmtNumber(asset.marketCapUsd)}</td>
-          </tr>
-        `;
-      });
-      table.innerHTML = rows.join("");
+      table.innerHTML = `<tr><td colspan="6" class="muted">Live data unavailable</td></tr>`;
+      const fallbackBtc = fallback.history(68000);
+      const fallbackEth = fallback.history(3600);
+      if (state.charts.btc) {
+        state.charts.btc.data.labels = fallbackBtc.labels;
+        state.charts.btc.data.datasets[0].data = fallbackBtc.values;
+        state.charts.btc.update("none");
+      }
+      if (state.charts.btcMini) {
+        state.charts.btcMini.data.labels = fallbackBtc.labels;
+        state.charts.btcMini.data.datasets[0].data = fallbackBtc.values;
+        state.charts.btcMini.update("none");
+      }
+      if (state.charts.ethMini) {
+        state.charts.ethMini.data.labels = fallbackEth.labels;
+        state.charts.ethMini.data.datasets[0].data = fallbackEth.values;
+        state.charts.ethMini.update("none");
+      }
     }
   }
 
   function startWebSocket() {
-    if (state.offlineUntil && Date.now() < state.offlineUntil) return;
-    if (state.websocket) {
-      state.websocket.close();
-      state.websocket = null;
-    }
-    try {
-      const ws = new WebSocket(API.ws);
-      state.websocket = ws;
-      ws.onmessage = (evt) => {
-        try {
-          const data = JSON.parse(evt.data);
-          if (data.bitcoin) {
-            const price = Number(data.bitcoin);
-            $("#btcPrice").textContent = fmtCurrency(price);
-            animateCard(document.querySelector('.crypto-card[data-filter*="bitcoin"]'));
-            state.lastPrices.btc = price;
-            pushChartPoint(state.charts.btc, price);
-            pushChartPoint(state.charts.btcMini, price);
-          }
-          if (data.ethereum) {
-            const price = Number(data.ethereum);
-            $("#ethPrice").textContent = fmtCurrency(price);
-            animateCard(document.querySelector('.crypto-card[data-filter*="ethereum"]'));
-            state.lastPrices.eth = price;
-            pushChartPoint(state.charts.ethMini, price);
-          }
-        } catch (e) {
-          console.error("WS parse error", e);
-        }
-      };
-      ws.onclose = () => setTimeout(startWebSocket, 4000);
-      ws.onerror = () => ws.close();
-    } catch (err) {
-      console.error("WebSocket error:", err);
-    }
+    // WebSocket feed disabled for CryptoCompare fallback
   }
 
   function pushChartPoint(chart, value) {
@@ -803,8 +743,9 @@
     }
   }
 
-  // Independent 60s crypto refresh loop
+  // Independent 60s crypto refresh loops
   setInterval(fetchCrypto, 60000);
+  setInterval(fetchMarkets, 60000);
 
   // ----- Notifications ----------------------------------------------------
   function notify(text) {
