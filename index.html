@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZynDash X - Real-Time Analytics Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://esm.run/web-llm"></script>
+  <style>
+    .flash-error {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff5c7a;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+      z-index: 220;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-bg glow-one"></div>
+  <div class="glow-bg glow-two"></div>
+  <div class="notification-tray" id="notificationTray" aria-live="polite"></div>
+
+  <div class="modal" id="settingsModal" aria-hidden="true" role="dialog">
+    <div class="modal-content">
+      <div class="modal-head">
+        <div class="title-with-icon">
+          <span class="icon-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M9.5 3h5l1 3h3.5v5L22 12l-3 1v5H15l-1 3h-4l-1-3H5V13L2 12l3-1V6H8.5z"/>
+            </svg>
+          </span>
+          <div>
+            <p class="eyebrow">Control Room</p>
+            <h3>Settings</h3>
+          </div>
+        </div>
+        <button class="ghost-btn ripple close-btn" data-close-modal aria-label="Close settings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-row">
+          <div>
+            <p>Animations</p>
+            <p class="muted small">Toggle micro-animations and transitions</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="animationsToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <p>Default Theme</p>
+            <p class="muted small">Light or dark preference on load</p>
+          </div>
+          <select id="defaultThemeSelect">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <p>Refresh Interval (seconds)</p>
+            <p class="muted small">Controls auto-refresh cadence</p>
+          </div>
+          <input type="number" id="refreshIntervalInput" min="5" max="120" step="5" value="20">
+        </div>
+        <div class="setting-actions">
+          <button class="primary-btn ripple" id="saveSettings">Save</button>
+          <button class="ghost-btn ripple" id="resetSettings">Reset to default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="fxModal" aria-hidden="true" role="dialog">
+    <div class="modal-content">
+      <div class="modal-head">
+        <div class="title-with-icon">
+          <span class="icon-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M4 12h16M12 4v16"/>
+            </svg>
+          </span>
+          <div>
+            <p class="eyebrow">FX Radar</p>
+            <h3>Currency Micro Chart</h3>
+          </div>
+        </div>
+        <button class="ghost-btn ripple close-btn" data-close-modal aria-label="Close FX radar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <canvas id="fxRadarChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+              <linearGradient id="grad-logo" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#5cf4ff"/>
+                <stop offset="100%" stop-color="#a07bff"/>
+              </linearGradient>
+            </defs>
+            <rect x="6" y="6" width="52" height="52" rx="14" fill="url(#grad-logo)" opacity="0.9"/>
+            <path d="M20 36c0-8 6-14 14-14h4v8h-4a6 6 0 0 0-6 6v12h-8z" fill="#0b0f1a"/>
+            <path d="M44 28c0 8-6 14-14 14h-4v-8h4a6 6 0 0 0 6-6V16h8z" fill="#0b0f1a"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="eyebrow">Zyntriax</span>
+          <h1>ZynDash <span>X</span></h1>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <a class="nav-link active" href="#overview" data-route="overview">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M4 9.5 12 4l8 5.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>
+            </svg>
+          </span>
+          <span>Overview</span>
+        </a>
+        <a class="nav-link" href="#markets" data-route="markets">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M4 6h16M4 12h10M4 18h7"/>
+            </svg>
+          </span>
+          <span>Markets</span>
+        </a>
+        <a class="nav-link" href="#realtime" data-route="realtime">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="7"/>
+              <path d="M12 9v3l1.8 1.2"/>
+            </svg>
+          </span>
+          <span>Real-Time</span>
+        </a>
+        <a class="nav-link" href="#weather" data-route="weather">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="4" y="4" width="16" height="16" rx="3"/>
+              <path d="M4 9h16"/>
+            </svg>
+          </span>
+          <span>Weather</span>
+        </a>
+        <a class="nav-link" href="#settings" data-route="settings" id="settingsOpen">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 3v18M3 12h18"/>
+            </svg>
+          </span>
+          <span>Settings</span>
+        </a>
+        <a class="nav-link" href="#ai" data-route="ai" id="aiOpen">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="6" y="3" width="12" height="18" rx="3"/>
+              <circle cx="10" cy="10" r="1.2"/>
+              <circle cx="14" cy="10" r="1.2"/>
+              <path d="M9 15h6"/>
+            </svg>
+          </span>
+          <span>ZynAI Assistant</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-dot"></div>
+        <div>
+          <p class="muted">Live Sync</p>
+          <p class="status">Realtime feed active</p>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="title-group">
+          <p class="eyebrow">Command Center</p>
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="m3 3 7.5 4v10.5L3 14zM20 3l-7.5 4v10.5L20 14z"/>
+              </svg>
+            </span>
+            <h2 id="pageTitle">Real-Time Analytics</h2>
+          </div>
+        </div>
+        <div class="actions">
+          <div class="search" data-tooltip="Filter cards and tables">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="11" cy="11" r="6"/>
+                <path d="m15.5 15.5 3 3"/>
+              </svg>
+            </span>
+            <input type="search" placeholder="Search signals, assets, weather..." aria-label="Search" id="searchInput">
+          </div>
+          <button class="ghost-btn ripple" id="refreshBtn" aria-label="Refresh data" data-tooltip="Reload data now">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M21 4v6h-6"/>
+              <path d="M3 20v-6h6"/>
+              <path d="M21 10a9 9 0 0 0-14.31-6.95L3 10"/>
+              <path d="M3 14a9 9 0 0 0 14.31 6.95L21 14"/>
+            </svg>
+          </button>
+          <button class="toggle ripple" id="themeToggle" aria-label="Toggle theme" data-tooltip="Light / Dark">
+            <span class="toggle-icon sun">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07-1.41 1.41M6.34 17.66l-1.41 1.41m12.73 0-1.41-1.41M6.34 6.34 4.93 4.93"/>
+              </svg>
+            </span>
+            <span class="toggle-icon moon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+              </svg>
+            </span>
+            <span class="toggle-label">Theme</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="section active" data-section="overview">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M12 3 3 9l9 6 9-6-9-6Z"/>
+                <path d="M3 15l9 6 9-6"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">Live pulse</p>
+              <h3>ZynDash Pulse Monitor</h3>
+            </div>
+          </div>
+          <div class="pill">Updated <span id="lastUpdated">--</span></div>
+        </div>
+        <div class="stats-grid">
+          <div class="card stat filterable crypto-card" data-filter="bitcoin btc price crypto">
+            <div class="card-top">
+              <p>Bitcoin</p>
+              <span class="chip chip-cyan">BTC</span>
+            </div>
+            <h4 id="btcPrice">$-</h4>
+            <p class="muted small">Tracking live via CoinCap</p>
+          </div>
+          <div class="card stat filterable crypto-card" data-filter="ethereum eth price crypto">
+            <div class="card-top">
+              <p>Ethereum</p>
+              <span class="chip chip-purple">ETH</span>
+            </div>
+            <h4 id="ethPrice">$-</h4>
+            <p class="muted small">Second-layer flows in sync</p>
+          </div>
+          <div class="card stat filterable" data-filter="scarborough weather wind code">
+            <div class="card-top">
+              <p>Scarborough Weather</p>
+              <span class="chip chip-blue">WX</span>
+            </div>
+            <h4><span id="tempValue">-</span>&deg;C</h4>
+            <p class="muted small">Wind <span id="windValue">-</span> m/s | Code <span id="weatherCode">-</span></p>
+          </div>
+          <div class="card stat filterable" data-filter="fx currency eur gbp">
+            <div class="card-top">
+              <p>FX Pulse</p>
+              <span class="chip chip-green">FX</span>
+            </div>
+            <h4>USD -&gt; EUR/GBP</h4>
+            <p class="muted small">EUR: <span id="eurRate">-</span> | GBP: <span id="gbpRate">-</span></p>
+            <button class="ghost-btn small-btn ripple" id="fxRadarBtn" aria-label="Open FX radar" data-tooltip="Open FX radar chart">FX Radar</button>
+          </div>
+        </div>
+
+        <div class="charts">
+          <div class="chart-card glass filterable" data-filter="btc trend chart" data-tooltip="BTC price trend with live updates">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Crypto</p>
+                <h4>BTC Live Trend</h4>
+              </div>
+              <div class="chip chip-cyan">Live feed</div>
+            </div>
+            <canvas id="btcChart" height="140"></canvas>
+          </div>
+          <div class="chart-card glass filterable" data-filter="weather atmosphere chart" data-tooltip="Live temperature and wind readings">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Atmospherics</p>
+                <h4>Weather Dynamics</h4>
+              </div>
+              <button class="ghost-btn small-btn ripple" id="liveWeatherBtn" aria-label="Toggle live weather">Live feed</button>
+            </div>
+            <canvas id="weatherChart" height="140"></canvas>
+          </div>
+          <div class="chart-card glass filterable" data-filter="currency fx chart" data-tooltip="USD split into EUR and GBP">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Currencies</p>
+                <h4>USD Conversion Split</h4>
+              </div>
+              <button class="ghost-btn small-btn ripple" id="openFxModal" aria-label="Open FX radar">FX radar</button>
+            </div>
+            <canvas id="currencyChart" height="140"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-section="overview">
+        <div class="card reactbits-panel">
+          <div class="card-head">
+            <div class="title-with-icon">
+              <span class="icon-pill">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M12 3v4m0 10v4M3 12h4m10 0h4M6.34 6.34l2.83 2.83m6.36 6.36 2.83 2.83m0-12.02-2.83 2.83m-6.36 6.36-2.83 2.83"/>
+                </svg>
+              </span>
+              <div>
+                <p class="eyebrow">Reactbits</p>
+                <h4>Quick Actions</h4>
+              </div>
+            </div>
+            <span class="pill">Interactive bits</span>
+          </div>
+          <div class="reactbits-grid">
+            <button class="bit-btn ripple" id="bitAutoRefresh" aria-label="Toggle auto refresh">
+              <div>
+                <p>Auto Refresh</p>
+                <p class="muted small">Reactbits switch for cadence</p>
+              </div>
+              <div class="bit-toggle"><span></span></div>
+            </button>
+            <button class="bit-btn ripple" id="bitGlow" aria-label="Toggle glow edges">
+              <div>
+                <p>Glow Edges</p>
+                <p class="muted small">Soft neon borders</p>
+              </div>
+              <div class="bit-toggle"><span></span></div>
+            </button>
+            <button class="bit-btn ripple" id="bitNotifications" aria-label="Toggle notifications">
+              <div>
+                <p>Notifications</p>
+                <p class="muted small">Inline toast updates</p>
+              </div>
+              <div class="bit-toggle"><span></span></div>
+            </button>
+            <button class="bit-btn ripple" id="bitCompact" aria-label="Toggle compact cards">
+              <div>
+                <p>Compact Mode</p>
+                <p class="muted small">Reactbits density tweak</p>
+              </div>
+              <div class="bit-toggle"><span></span></div>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-section="markets">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M4 6h16M4 12h10M4 18h7"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">Markets</p>
+              <h3>BTC / ETH Performance</h3>
+            </div>
+          </div>
+          <div class="pill">Market depth</div>
+        </div>
+        <div class="card table-card">
+          <div class="table-head">
+            <h4>Price Board</h4>
+            <button class="ghost-btn small-btn ripple" id="marketsRefresh">Refresh</button>
+          </div>
+          <table class="markets-table" aria-label="Market data">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Price</th>
+                <th>24h</th>
+                <th>High</th>
+                <th>Low</th>
+                <th>Market Cap</th>
+              </tr>
+            </thead>
+            <tbody id="marketsTable">
+              <tr><td colspan="6" class="muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="charts">
+          <div class="chart-card glass" data-tooltip="BTC sparkline with 7d context">
+            <div class="card-head">
+              <p class="eyebrow">BTC</p>
+              <h4>Micro Trend</h4>
+            </div>
+            <canvas id="btcMini" height="140"></canvas>
+          </div>
+          <div class="chart-card glass" data-tooltip="ETH sparkline with 7d context">
+            <div class="card-head">
+              <p class="eyebrow">ETH</p>
+              <h4>Micro Trend</h4>
+            </div>
+            <canvas id="ethMini" height="140"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-section="realtime">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="12" cy="12" r="7"/>
+                <path d="M12 9v3l1.8 1.2"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">Stream</p>
+              <h3>Realtime Operations</h3>
+            </div>
+          </div>
+          <div class="pill">Live controls</div>
+        </div>
+        <div class="controls-row">
+          <button class="primary-btn ripple" id="liveToggle" aria-pressed="true" data-tooltip="Toggle live updates">Live Feed: ON</button>
+          <button class="ghost-btn ripple" id="autoRefresh" data-tooltip="Start/Stop auto refresh">Auto-refresh</button>
+          <button class="ghost-btn ripple" id="pulsePower" aria-pressed="true" data-tooltip="Pause ticker">Power: ON</button>
+        </div>
+        <div class="ticker" aria-label="Live ticker">
+          <div class="ticker-track" id="tickerTrack">
+            <span class="ticker-item">ZynDash X ready...</span>
+          </div>
+        </div>
+        <div class="card feed-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Pulse feed</p>
+              <h4>Live entries</h4>
+            </div>
+            <button class="ghost-btn small-btn ripple" id="clearFeed">Clear</button>
+          </div>
+          <ul id="feedList"></ul>
+        </div>
+      </section>
+
+      <section class="section" data-section="weather">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M3 14a4 4 0 0 1 4-4h1a4 4 0 0 1 7.8-1.5 3.5 3.5 0 1 1 1.7 6.5H7a4 4 0 0 1-4-4Z"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">Weather</p>
+              <h3>Scarborough Atmospherics</h3>
+            </div>
+          </div>
+          <div class="pill">Forecast & live</div>
+        </div>
+        <div class="stats-grid">
+
+          <div class="card stat filterable" data-filter="temperature weather">
+            <div class="card-top">
+              <p>Temperature</p>
+              <span class="chip chip-blue">&deg;C</span>
+            </div>
+            <h4><span id="tempDetail">-</span>&deg;C</h4>
+            <p class="muted small">Feels steady</p>
+          </div>
+          <div class="card stat filterable" data-filter="wind speed">
+            <div class="card-top">
+              <p>Wind</p>
+              <span class="chip chip-cyan">Wind</span>
+            </div>
+            <h4><span id="windDetail">-</span> m/s</h4>
+            <p class="muted small">Direction-aware</p>
+          </div>
+          <div class="card stat filterable" data-filter="humidity">
+            <div class="card-top">
+              <p>Humidity</p>
+              <span class="chip chip-green">%</span>
+            </div>
+            <h4><span id="humidityDetail">-</span>%</h4>
+            <p class="muted small">Air saturation</p>
+          </div>
+          <div class="card stat filterable" data-filter="weather code">
+            <div class="card-top">
+              <p>Condition</p>
+              <span class="chip chip-purple">Code</span>
+            </div>
+            <div class="weather-icon" id="weatherIcon" aria-label="Weather icon">Cloud</div>
+            <h4 id="weatherCodeDetail">-</h4>
+            <p class="muted small">Live code</p>
+          </div>
+        </div>
+        <div class="chart-card glass" data-tooltip="5-day forecast highs and lows">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Forecast</p>
+              <h4>5-Day Trend</h4>
+            </div>
+            <span class="chip chip-blue">Auto-refresh</span>
+          </div>
+          <canvas id="forecastChart" height="200"></canvas>
+        </div>
+      </section>
+
+      <section class="section" data-section="settings">
+        <div class="headline">
+          <div class="title-with-icon">
+            <span class="icon-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M12 3v2m0 14v2m9-9h-2M5 12H3m13.66-7.66-1.42 1.42M6.76 17.24l-1.42 1.42m12.02 0-1.42-1.42M6.76 6.76 5.34 5.34"/>
+              </svg>
+            </span>
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h3>Preferences</h3>
+            </div>
+          </div>
+          <div class="pill">Tune experience</div>
+        </div>
+        <div class="card">
+          <p class="muted">Open the settings modal to tune animations, default theme, and refresh intervals.</p>
+          <div class="controls-row">
+            <button class="primary-btn ripple" id="openSettingsModal">Open settings</button>
+            <button class="ghost-btn ripple" id="resetFromPanel">Reset to default</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <p>ZynDash X — Crafted for real-time clarity.</p>
+        <p class="muted">Neon-grade analytics with dark/light elegance.</p>
+      </footer>
+    </div>
+  </div>
+
+  <nav class="mobile-nav">
+    <a href="#overview" class="mobile-link active" data-mobile-route="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M4 9.5 12 4l8 5.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>
+      </svg>
+      <span>Home</span>
+    </a>
+    <a href="#markets" class="mobile-link" data-mobile-route="markets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M3 12h18M3 6h18M3 18h18"/>
+      </svg>
+      <span>Markets</span>
+    </a>
+    <a href="#realtime" class="mobile-link" data-mobile-route="realtime">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="12" r="7"/>
+        <path d="M12 9v3l1.8 1.2"/>
+      </svg>
+      <span>Realtime</span>
+    </a>
+    <a href="#weather" class="mobile-link" data-mobile-route="weather">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="4" y="4" width="16" height="16" rx="3"/>
+        <path d="M4 9h16"/>
+      </svg>
+      <span>Weather</span>
+    </a>
+    <a href="#ai" class="mobile-link" data-mobile-route="ai">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="6" y="3" width="12" height="18" rx="3"/>
+        <circle cx="10" cy="10" r="1.2"/>
+        <circle cx="14" cy="10" r="1.2"/>
+        <path d="M9 15h6"/>
+      </svg>
+      <span>ZynAI</span>
+    </a>
+  </nav>
+
+  <div class="ai-overlay" id="aiOverlay"></div>
+  <div class="ai-panel" id="aiPanel" aria-hidden="true" role="dialog">
+    <div class="ai-header">
+      <div class="title-with-icon">
+        <span class="icon-pill glow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <rect x="6" y="3" width="12" height="18" rx="3"/>
+            <circle cx="10" cy="10" r="1.2"/>
+            <circle cx="14" cy="10" r="1.2"/>
+            <path d="M9 15h6"/>
+          </svg>
+        </span>
+        <div>
+          <p class="eyebrow">ZynAI</p>
+          <h3>ZynAI Assistant</h3>
+        </div>
+      </div>
+      <div class="ai-actions">
+        <button class="ghost-btn small-btn ripple" id="aiMinimize" aria-label="Minimize chat">_</button>
+        <button class="ghost-btn small-btn ripple" id="aiClose" aria-label="Close chat">&times;</button>
+      </div>
+    </div>
+    <div class="ai-body" id="aiBody">
+      <div class="ai-messages" id="aiMessages" aria-live="polite"></div>
+      <div class="ai-typing" id="aiTyping">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <form class="ai-input" id="aiForm">
+      <textarea id="aiTextarea" rows="1" placeholder="Ask ZynAI..." aria-label="Type your message"></textarea>
+      <button type="submit" class="primary-btn ripple" id="aiSend" aria-label="Send message">Send</button>
+    </form>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web-llm"></script>
+</body>
+</html>
